@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>CurveLab · 缺测日内曲线函数型分析</title>
+<link rel="stylesheet" href="styles.css">
+</head>
+<body data-theme="light">
+<header class="topbar">
+  <div class="brand">
+    <strong>CurveLab</strong>
+    <span class="subtitle">虚构站点 · 日内需求曲线函数型分析</span>
+  </div>
+  <div class="top-actions">
+    <span id="baseline-badge" class="badge" title="基线冻结：新日只评分，不移动 medoid 与阈值">
+      基线已冻结
+    </span>
+    <button id="theme-toggle" class="btn ghost" type="button">深色</button>
+  </div>
+</header>
+
+<main class="layout">
+  <!-- 左栏：控制与日列表 -->
+  <aside class="panel sidebar">
+    <section class="control-block">
+      <h2>分析参数</h2>
+      <label class="ctrl">
+        <span>平滑度 λ <em id="lam-val">自动</em></span>
+        <input type="range" id="lam" min="-4" max="6" step="0.25" value="0" disabled>
+        <label class="inline-check"><input type="checkbox" id="auto-lam" checked>
+          GCV 自动选择</label>
+      </label>
+      <label class="ctrl">
+        <span>最大时间拉伸 s<sub>max</sub>
+          <em id="smax-val">1.5×</em></span>
+        <input type="range" id="smax" min="1.1" max="2.5" step="0.05" value="1.5">
+      </label>
+      <label class="ctrl">
+        <span>聚类数 k <em id="k-val">3</em></span>
+        <input type="range" id="k" min="2" max="5" step="1" value="3">
+      </label>
+      <label class="ctrl">
+        <span>基函数数 <em id="nbasis-val">20</em></span>
+        <input type="range" id="nbasis" min="10" max="28" step="2" value="20">
+      </label>
+      <label class="ctrl">
+        <span>缺测判定半径（小时）<em id="cov-val">0.75</em></span>
+        <input type="range" id="cov" min="0.4" max="1.5" step="0.05" value="0.75">
+      </label>
+      <button id="rebuild" class="btn primary" type="button">按参数重建基线</button>
+      <p class="hint">重建只作用于训练日；medoid 与阈值随后重新冻结。</p>
+    </section>
+
+    <section class="control-block">
+      <h2>数据接入</h2>
+      <p class="hint" style="margin-top:0">
+        CSV 列：<code>day_id,time,value</code>（时间 0–24h，缺测直接缺行，<b>不要填零</b>）；
+        或 JSON：<code>{"days":[{"day_id","times","values"}]}</code>。
+      </p>
+      <input type="file" id="upload-file" accept=".csv,.json"
+             style="font-size:12px;max-width:100%">
+      <p id="upload-status" class="hint"></p>
+    </section>
+
+    <section class="control-block">
+      <h2>内置样例（对照冻结基线评分）</h2>
+      <div id="example-buttons" class="example-grid"></div>
+    </section>
+
+    <section class="control-block">
+      <h2>日列表 <span id="day-count" class="muted"></span></h2>
+      <div class="filters">
+        <select id="filter-status">
+          <option value="">全部状态</option>
+          <option value="cluster">已聚类</option>
+          <option value="anomaly">异常日</option>
+          <option value="undetermined">未定</option>
+        </select>
+        <select id="filter-cluster">
+          <option value="">全部类</option>
+        </select>
+      </div>
+      <ul id="day-list" class="day-list"></ul>
+    </section>
+  </aside>
+
+  <!-- 中栏：曲线主视图 -->
+  <section class="panel main-view">
+    <div class="chart-toolbar">
+      <div class="view-toggle">
+        <button class="btn seg active" data-view="overlay" type="button">叠加曲线</button>
+        <button class="btn seg" data-view="single" type="button">单日重建</button>
+        <button class="btn seg" data-view="pair" type="button">两日对齐</button>
+      </div>
+      <div class="overlay-options">
+        <label class="inline-check"><input type="checkbox" id="show-band" checked>
+          95% 重建带</label>
+        <label class="inline-check"><input type="checkbox" id="show-gaps" checked>
+          缺测段</label>
+        <label class="inline-check"><input type="checkbox" id="show-centroids">
+          类中心</label>
+        <label class="inline-check"><input type="checkbox" id="show-obs" checked>
+          原始观测点</label>
+      </div>
+    </div>
+    <div id="chart-wrap" class="chart-wrap">
+      <svg id="chart" role="img" aria-label="日内曲线图"></svg>
+      <div id="tooltip" class="tooltip" hidden></div>
+    </div>
+    <div id="legend" class="legend"></div>
+    <div class="gap-drag-hint muted" id="drag-hint">
+      单日视图：在图上横向拖动可查看任意时刻的重建值与不确定性；缺测段以阴影标出。
+    </div>
+  </section>
+
+  <!-- 右栏：解释面板 -->
+  <aside class="panel details">
+    <section id="day-detail" class="control-block">
+      <h2>单日解释</h2>
+      <div id="day-detail-body" class="detail-body muted">从左栏选择一天</div>
+    </section>
+    <section id="pair-detail" class="control-block" hidden>
+      <h2>距离分解（相位 / 峰高 / 形状）</h2>
+      <div id="pair-detail-body"></div>
+    </section>
+    <section class="control-block">
+      <h2>类中心更新留痕</h2>
+      <ul id="history-list" class="history-list"></ul>
+    </section>
+  </aside>
+</main>
+
+<script src="app.js"></script>
+</body>
+</html>
